@@ -1,0 +1,111 @@
+global:
+  seed : 10
+  task : denoise
+  action : 'train'
+  dir_record :
+    main_dir : ./results
+    main_name : ablation_uformertiny_gaussian
+    sub_dir:
+      runlog: runlog
+      save_ckpt: save_ckpt
+      resume_ckpt: resume_ckpt
+      save_state: save_state
+      best_ckpt : best_ckpt
+
+
+dataset:
+  task : 'denoise'
+  name : 'syn_data_oss'
+  param:
+    train :
+      hq_path: s3://lianghao02-ir/dataset/filelist/icvl_256.txt
+      oss: True
+      patch_size : 128
+      scale : 1
+      flip : True
+      rotation: True
+      noise_level: 30
+      noise_clip: False
+      noise_type: "blind-gaussian"
+
+    test:
+      hq_path: s3://lianghao02-ir/dataset/filelist/icvl_test.txt
+      oss: True
+      noise_level: 50
+      noise_clip: False
+      noise_type: "gaussian"
+
+
+loss:
+  pixel :
+    name : char
+    param :
+      loss_weight : 1.
+      reduction : mean
+
+
+net:
+  task : 'ablation'
+  net_g :
+    name : 'uformer'
+    param:
+      in_chans: 31
+      depth: [1, 1, 1, 1, 1, 1, 1, 1, 1]
+      dd_in: 31
+      img_size: 64
+      embed_dim: 32
+      win_size: 8
+      mlp_ratio: 2
+      token_projection: linear
+      token_mlp: leff
+      modulator: True
+
+
+model :
+  task : 'denoise'
+  name : 'hsi'
+
+train:
+  num_node : 1
+  num_worker : 8
+  batch_per_gpu : 4
+  num_gpu_per_node : 8
+  save_freq : !!float 1e4
+  print_freq : 200
+  total_iters : !!float 4e5
+  init:
+    state : False
+    name : ~
+  resume:
+    state: True
+    mode: all
+    ckpt: results/denoise/ablation_uformertiny_gaussian/0303_19_41/save_state/save_iter_290000
+  optim:
+    optimizer:
+      name : 'AdamW'
+      param :
+        lr : 2.e-4
+        weight_decay : 0.02
+        betas : [0.9, 0.999]
+
+    scheduler:
+      name : 'CosineAnnealingLR'
+      param :
+        T_max : 3200000 # 单卡 4e5 x 8 (gpu个数)
+        eta_min : 1.e-6
+
+val:
+  val_freq : !!float 4e3
+  metric:
+    name: image
+    param:
+      psnr:
+        crop_border: 0
+        input_order: 'HWC'
+        test_y_channel: False
+      ssim:
+        crop_border: 0
+        input_order: 'HWC'
+        test_y_channel: False
+      sam:
+        crop_border: 0
